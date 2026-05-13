@@ -36,6 +36,17 @@ export default function App() {
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [notification, setNotification] = useState({ visible: false, message: '', type: 'success' });
+
+  // Función para mostrar notificaciones
+  const showNotification = (message, type = 'success') => {
+    setNotification({ visible: true, message, type });
+    setTimeout(() => {
+      setNotification(prev => ({ ...prev, visible: false }));
+    }, 3000);
+  };
+
 
   // Suscripción en tiempo real a la base de datos (Realtime Database)
   useEffect(() => {
@@ -62,6 +73,7 @@ export default function App() {
       setLoading(false);
     }, (error) => {
       console.error("Error al obtener notas: ", error);
+      showNotification("Error al cargar las notas", "error");
       setLoading(false);
     });
 
@@ -72,6 +84,7 @@ export default function App() {
   const handleSubmit = async () => {
     if (content.trim() === '') return;
 
+    setIsProcessing(true);
     try {
       if (editingId) {
         // Actualizar nota existente
@@ -81,6 +94,7 @@ export default function App() {
           updatedAt: serverTimestamp()
         });
         setEditingId(null);
+        showNotification("Nota actualizada con éxito");
       } else {
         // Crear nueva nota
         const notesRef = ref(db, 'mensaje');
@@ -90,8 +104,9 @@ export default function App() {
           timestamp: serverTimestamp()
         });
         
-        // También actualizamos el campo 'ultimo_mensaje' en la raíz como se ve en la imagen
+        // También actualizamos el campo 'ultimo_mensaje' en la raíz
         await set(ref(db, 'ultimo_mensaje'), serverTimestamp());
+        showNotification("Nota guardada correctamente");
       }
       
       // Limpiar campos y cerrar teclado
@@ -99,17 +114,25 @@ export default function App() {
       Keyboard.dismiss();
     } catch (error) {
       console.error("Error al guardar nota: ", error);
+      showNotification("Error al guardar la nota", "error");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   // Eliminar una nota
   const deleteNote = async (id) => {
+    setIsProcessing(true);
     try {
       const noteRef = ref(db, `mensaje/${id}`);
       await remove(noteRef);
       if (editingId === id) cancelEdit();
+      showNotification("Nota eliminada");
     } catch (error) {
       console.error("Error al eliminar nota: ", error);
+      showNotification("Error al eliminar la nota", "error");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -133,16 +156,34 @@ export default function App() {
     return date.toLocaleString();
   };
 
+  // Componente de Notificación
+  const Notification = () => {
+    if (!notification.visible) return null;
+    return (
+      <View style={[styles.notificationContainer, notification.type === 'error' ? styles.errorNotification : styles.successNotification]}>
+        <Text style={styles.notificationText}>{notification.message}</Text>
+      </View>
+    );
+  };
+
   // Renderizado de cada tarjeta de nota
   const renderItem = ({ item }) => (
     <View style={styles.noteCard}>
       <View style={styles.noteHeader}>
         <Text style={styles.noteContent}>{item.texto}</Text>
         <View style={styles.actionButtons}>
-          <TouchableOpacity onPress={() => startEdit(item)} style={styles.actionButton}>
+          <TouchableOpacity 
+            onPress={() => startEdit(item)} 
+            style={styles.actionButton}
+            disabled={isProcessing}
+          >
             <Edit3 size={18} color="#4ecca3" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => deleteNote(item.id)} style={styles.actionButton}>
+          <TouchableOpacity 
+            onPress={() => deleteNote(item.id)} 
+            style={styles.actionButton}
+            disabled={isProcessing}
+          >
             <Trash2 size={18} color="#ff4d4d" />
           </TouchableOpacity>
         </View>
@@ -159,6 +200,15 @@ export default function App() {
       <View style={styles.responsiveWrapper}>
         <StatusBar barStyle="light-content" />
         
+        <Notification />
+        
+        {isProcessing && (
+          <View style={styles.processingOverlay}>
+            <ActivityIndicator size="large" color="#4ecca3" />
+            <Text style={styles.processingText}>Procesando...</Text>
+          </View>
+        )}
+
         <View style={styles.header}>
           <NotepadText color="#4ecca3" size={32} />
           <Text style={styles.title}>Super Notas</Text>
@@ -177,23 +227,32 @@ export default function App() {
               onChangeText={setContent}
               multiline
               textAlignVertical="top"
+              editable={!isProcessing}
             />
             <View style={styles.buttonRow}>
               {editingId && (
                 <TouchableOpacity 
                   style={[styles.submitButton, styles.cancelButton]} 
                   onPress={cancelEdit}
+                  disabled={isProcessing}
                 >
                   <X size={20} color="#fff" />
                   <Text style={styles.buttonText}>Cancelar</Text>
                 </TouchableOpacity>
               )}
               <TouchableOpacity 
-                style={[styles.submitButton, editingId ? styles.updateButton : styles.addButton]} 
+                style={[styles.submitButton, editingId ? styles.updateButton : styles.addButton, isProcessing && styles.disabledButton]} 
                 onPress={handleSubmit}
+                disabled={isProcessing}
               >
-                {editingId ? <Save size={20} color="#fff" /> : <Plus size={20} color="#fff" />}
-                <Text style={styles.buttonText}>{editingId ? 'Actualizar' : 'Añadir Nota'}</Text>
+                {isProcessing ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    {editingId ? <Save size={20} color="#fff" /> : <Plus size={20} color="#fff" />}
+                    <Text style={styles.buttonText}>{editingId ? 'Actualizar' : 'Añadir Nota'}</Text>
+                  </>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -343,5 +402,49 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 50,
     fontSize: 16,
+  },
+  notificationContainer: {
+    position: 'absolute',
+    top: Platform.OS === 'web' ? 20 : 50,
+    left: 20,
+    right: 20,
+    padding: 15,
+    borderRadius: 12,
+    zIndex: 1000,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  successNotification: {
+    backgroundColor: 'rgba(78, 204, 163, 0.9)',
+  },
+  errorNotification: {
+    backgroundColor: 'rgba(255, 77, 77, 0.9)',
+  },
+  notificationText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  processingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    zIndex: 999,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 20,
+  },
+  processingText: {
+    color: '#fff',
+    marginTop: 10,
+    fontWeight: 'bold',
+  },
+  disabledButton: {
+    opacity: 0.7,
   },
 });
