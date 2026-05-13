@@ -74,5 +74,4 @@ blog-notas/
 -   **Móvil**: Escanea el código QR con la app **Expo Go**.
 -   **Web**: Presiona `w` en la terminal o abre `http://localhost:8081`.
 
----
-Desarrollado y optimizado por **Antigravity AI**
+
