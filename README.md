@@ -4,7 +4,7 @@ Una aplicación de notas premium, multiplataforma y con sincronización en tiemp
 
 ![Plataformas](https://img.shields.io/badge/Plataforma-Android%20%7C%20iOS%20%7C%20Web-blue)
 ![Firebase](https://img.shields.io/badge/Database-Firebase%20Realtime%20Database-yellow)
-![Model](https://img.shields.io/badge/AI%20Model-Gemini%203%20Flash-purple)
+
 
 ## ✨ Características Principales
 
@@ -74,5 +74,4 @@ blog-notas/
 -   **Móvil**: Escanea el código QR con la app **Expo Go**.
 -   **Web**: Presiona `w` en la terminal o abre `http://localhost:8081`.
 
----
-Desarrollado y optimizado por **Antigravity AI**
+
